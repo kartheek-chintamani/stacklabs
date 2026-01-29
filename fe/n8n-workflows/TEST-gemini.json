@@ -1,0 +1,69 @@
+{
+  "name": "TEST - Gemini API",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "start",
+      "name": "When clicking 'Test workflow'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  json: {\n    contents: [\n      {\n        parts: [\n          {\n            text: \"Say hello in 5 words\"\n          }\n        ]\n      }\n    ]\n  }\n};"
+      },
+      "id": "create-body",
+      "name": "Create Request Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyBGwcKNfNbtoXApx-TBf5OsmZ8QV1016WE",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "call-api",
+      "name": "Call Gemini",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconsole.log('Response:', JSON.stringify(response, null, 2));\nreturn { json: response };"
+      },
+      "id": "log",
+      "name": "Log Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    }
+  ],
+  "connections": {
+    "When clicking 'Test workflow'": {
+      "main": [[{"node": "Create Request Body", "type": "main", "index": 0}]]
+    },
+    "Create Request Body": {
+      "main": [[{"node": "Call Gemini", "type": "main", "index": 0}]]
+    },
+    "Call Gemini": {
+      "main": [[{"node": "Log Response", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {"executionOrder": "v1"}
+}

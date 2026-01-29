@@ -1,0 +1,349 @@
+{
+  "name": "WF1 - Trend Discovery",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Schedule Daily 6am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://trends.google.com/trends/api/dailytrends",
+        "options": {
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "geo",
+                "value": "US"
+              },
+              {
+                "name": "hl",
+                "value": "en-US"
+              }
+            ]
+          }
+        }
+      },
+      "name": "Google Trends API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [450, 200]
+    },
+    {
+      "parameters": {
+        "url": "https://api.producthunt.com/v2/api/graphql",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$env.PRODUCT_HUNT_TOKEN}}"
+            }
+          ]
+        },
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "{ posts(order: VOTES) { edges { node { name tagline votesCount } } } }"
+            }
+          ]
+        }
+      },
+      "name": "Product Hunt API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://www.reddit.com/r/{{ $env.NICHE_SUBREDDIT }}/hot.json",
+        "options": {
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "limit",
+                "value": "25"
+              }
+            ]
+          }
+        }
+      },
+      "name": "Reddit API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [450, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge all trend sources\nconst googleTrends = $input.first().json.trendsData || [];\nconst productHuntPosts = $input.all()[1]?.json?.data?.posts?.edges || [];\nconst redditPosts = $input.all()[2]?.json?.data?.children || [];\n\n// Extract and normalize topics\nconst topics = [];\n\n// Process Google Trends\ngoogleTrends.slice(0, 5).forEach(trend => {\n  topics.push({\n    title: trend.title?.query || trend.query,\n    description: trend.articles?.[0]?.snippet || '',\n    source: 'google_trends',\n    source_url: trend.articles?.[0]?.url || '',\n    search_volume: trend.formattedTraffic || 'Unknown',\n    raw_data: trend\n  });\n});\n\n// Process Product Hunt\nproductHuntPosts.slice(0, 5).forEach(post => {\n  const node = post.node;\n  topics.push({\n    title: node.name,\n    description: node.tagline,\n    source: 'product_hunt',\n    source_url: `https://www.producthunt.com/posts/${node.slug}`,\n    votes: node.votesCount,\n    raw_data: node\n  });\n});\n\n// Process Reddit\nredditPosts.slice(0, 5).forEach(post => {\n  const data = post.data;\n  topics.push({\n    title: data.title,\n    description: data.selftext?.substring(0, 200) || data.title,\n    source: 'reddit',\n    source_url: `https://www.reddit.com${data.permalink}`,\n    upvotes: data.ups,\n    comments: data.num_comments,\n    raw_data: data\n  });\n});\n\nreturn topics.map(topic => ({ json: topic }));"
+      },
+      "name": "Merge & Normalize Topics",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "model": "gemini-pro",
+        "prompt": "=You are a content strategy analyst for an affiliate marketing platform focused on: {{ $env.NICHE_CATEGORY }}\n\nAnalyze this topic and determine if it's worth creating content about:\n\nTopic: {{ $json.title }}\nDescription: {{ $json.description }}\nSource: {{ $json.source }}\n\nProvide your analysis in JSON format:\n{\n  \"is_relevant\": true/false,\n  \"quality_score\": 0-100,\n  \"reasoning\": \"Detailed explanation\",\n  \"estimated_searches\": number,\n  \"competition_level\": \"low\"|\"medium\"|\"high\",\n  \"content_angle\": \"Suggested article approach\",\n  \"potential_keywords\": [\"keyword1\", \"keyword2\"],\n  \"monetization_potential\": 0-100,\n  \"affiliate_products\": [\"Suggested products to feature\"]\n}\n\nBe critical. Only recommend topics with:\n- Clear monetization potential (affiliate products available)\n- Sufficient search volume (500+ monthly searches estimated)\n- Not overly saturated by major publications\n- Alignment with {{ $env.NICHE_CATEGORY }} niche\n\nRespond ONLY with the JSON object, no additional text.",
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "name": "Gemini Analysis",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [850, 300],
+      "credentials": {
+        "googleGeminiApi": {
+          "id": "1",
+          "name": "Google Gemini API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Gemini response and add to topic\nconst topic = $input.first().json;\nconst geminiResponse = $json.response;\n\nlet analysis;\ntry {\n  // Try to parse as JSON\n  analysis = typeof geminiResponse === 'string' \n    ? JSON.parse(geminiResponse) \n    : geminiResponse;\n} catch (e) {\n  // If parsing fails, mark as low quality\n  analysis = {\n    is_relevant: false,\n    quality_score: 0,\n    reasoning: 'Failed to parse AI analysis',\n    estimated_searches: 0,\n    competition_level: 'unknown'\n  };\n}\n\n// Only pass through relevant topics with score >= 60\nif (analysis.is_relevant && analysis.quality_score >= 60) {\n  return {\n    json: {\n      topic_title: topic.title,\n      topic_description: topic.description,\n      niche_category: $env.NICHE_CATEGORY,\n      discovered_via: topic.source,\n      source_url: topic.source_url,\n      ai_analysis: analysis,\n      quality_score: analysis.quality_score,\n      estimated_monthly_searches: analysis.estimated_searches,\n      competition_level: analysis.competition_level,\n      status: 'pending_approval'\n    }\n  };\n}\n\n// Filter out low quality topics\nreturn null;"
+      },
+      "name": "Filter & Format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "content_topics",
+        "columns": "topic_title,topic_description,niche_category,discovered_via,source_url,ai_analysis,quality_score,estimated_monthly_searches,competition_level,status",
+        "options": {}
+      },
+      "name": "Insert to Supabase",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1250, 300],
+      "credentials": {
+        "supabaseApi": {
+          "id": "2",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get count of inserted topics\nconst insertedCount = $input.all().length;\n\nreturn {\n  json: {\n    count: insertedCount,\n    message: `${insertedCount} high-quality topics discovered and ready for review`,\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "name": "Count Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "operation": "sendEmail",
+        "to": "={{ $env.ADMIN_EMAIL }}",
+        "subject": "✨ {{ $json.count }} New Topics Ready for Review",
+        "text": "=Good morning!\n\nWF1 - Trend Discovery has found {{ $json.count }} high-quality content topics for {{ $env.NICHE_CATEGORY }}.\n\n🔍 Review them here:\n{{ $env.SITE_URL }}/admin/topics\n\nThese topics are ranked by AI quality score and monetization potential.\n\nApprove the best ones to trigger automatic content generation.\n\n---\nLinkGenieKR Automation\nExecuted at: {{ $json.timestamp }}",
+        "options": {
+          "allowUnauthorizedCerts": false
+        }
+      },
+      "name": "Email Notification",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1650, 300],
+      "credentials": {
+        "smtp": {
+          "id": "3",
+          "name": "SMTP Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "functionName": "log_workflow_execution",
+        "parameters": {
+          "parameters": [
+            {
+              "name": "p_workflow_name",
+              "value": "WF1 - Trend Discovery"
+            },
+            {
+              "name": "p_workflow_id",
+              "value": "={{ $workflow.id }}"
+            },
+            {
+              "name": "p_execution_id",
+              "value": "={{ $execution.id }}"
+            },
+            {
+              "name": "p_status",
+              "value": "success"
+            },
+            {
+              "name": "p_tokens_used",
+              "value": "={{ $node['Gemini Analysis'].json.usage?.totalTokens || 0 }}"
+            },
+            {
+              "name": "p_cost_usd",
+              "value": "0.02"
+            }
+          ]
+        }
+      },
+      "name": "Log to Supabase",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1650, 400],
+      "credentials": {
+        "supabaseApi": {
+          "id": "2",
+          "name": "Supabase API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Daily 6am": {
+      "main": [
+        [
+          {
+            "node": "Google Trends API",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Product Hunt API",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Reddit API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Trends API": {
+      "main": [
+        [
+          {
+            "node": "Merge & Normalize Topics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Product Hunt API": {
+      "main": [
+        [
+          {
+            "node": "Merge & Normalize Topics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reddit API": {
+      "main": [
+        [
+          {
+            "node": "Merge & Normalize Topics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge & Normalize Topics": {
+      "main": [
+        [
+          {
+            "node": "Gemini Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Analysis": {
+      "main": [
+        [
+          {
+            "node": "Filter & Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter & Format": {
+      "main": [
+        [
+          {
+            "node": "Insert to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert to Supabase": {
+      "main": [
+        [
+          {
+            "node": "Count Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Count Results": {
+      "main": [
+        [
+          {
+            "node": "Email Notification",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2026-01-28T00:00:00.000Z",
+  "versionId": "1"
+}

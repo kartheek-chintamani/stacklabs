@@ -1,0 +1,168 @@
+{
+  "name": "Topic Discovery - Daily Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule - Every Day 6 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Define topic search queries for AI/Dev tools\nconst searches = [\n  'AI coding tools 2026',\n  'best AI developer tools',\n  'AI productivity tools developers',\n  'new AI coding assistants',\n  'AI automation tools programming',\n  'machine learning tools developers',\n  'AI code review tools',\n  'AI testing automation tools'\n];\n\nreturn searches.map(query => ({\n  json: { searchQuery: query }\n}));"
+      },
+      "id": "define-searches",
+      "name": "Define Search Topics",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyBGwcKNfNbtoXApx-TBf5OsmZ8QV1016WE",
+        "authentication": "none",
+        "sendQuery": false,
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"You are a content strategist for DevTools Nexus, an affiliate site reviewing AI productivity tools for developers.\\n\\nAnalyze this search query and generate 3 specific article topic ideas: {{ $json.searchQuery }}\\n\\nFor each topic, consider:\\n- Current trends in AI/developer tools\\n- Search intent and user needs\\n- SEO potential and keyword opportunities\\n- Affiliate monetization potential\\n- Unique angle or value proposition\\n\\nReturn ONLY valid JSON (no markdown, no extra text):\\n{\\n  \\\"topics\\\": [\\n    {\\n      \\\"title\\\": \\\"Specific article title\\\",\\n      \\\"description\\\": \\\"What the article will cover\\\",\\n      \\\"keywords\\\": [\\\"keyword1\\\", \\\"keyword2\\\", \\\"keyword3\\\"],\\n      \\\"targetAudience\\\": \\\"who this is for\\\",\\n      \\\"contentType\\\": \\\"review|tutorial|comparison|guide\\\",\\n      \\\"estimatedSearchVolume\\\": \\\"high|medium|low\\\",\\n      \\\"competitionLevel\\\": \\\"high|medium|low\\\",\\n      \\\"monetizationPotential\\\": \\\"high|medium|low\\\",\\n      \\\"reasoning\\\": \\\"Why this topic is valuable\\\"\\n    }\\n  ]\\n}\"\n    }]\n  }],\n  \"generationConfig\": {\n    \"temperature\": 0.8,\n    \"topP\": 0.9,\n    \"maxOutputTokens\": 2048\n  }\n}",
+        "options": {}
+      },
+      "id": "ai-analyze",
+      "name": "AI Topic Analysis (Gemini)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse AI response and extract topics\nconst response = $input.first().json;\n\ntry {\n  const generatedText = response.candidates[0].content.parts[0].text;\n  const cleanText = generatedText.replace(/```json\\n?|```\\n?/g, '');\n  const result = JSON.parse(cleanText);\n  \n  return result.topics.map(topic => ({\n    json: {\n      topic_title: topic.title,\n      description: topic.description,\n      keywords: topic.keywords,\n      target_audience: topic.targetAudience,\n      content_type: topic.contentType,\n      estimated_traffic: topic.estimatedSearchVolume,\n      competition_level: topic.competitionLevel,\n      monetization_potential: topic.monetizationPotential,\n      discovery_reasoning: topic.reasoning,\n      status: 'pending_approval',\n      source: 'ai_discovery',\n      discovered_at: new Date().toISOString()\n    }\n  }));\n} catch (error) {\n  console.error('Parse error:', error);\n  return [];\n}"
+      },
+      "id": "parse-topics",
+      "name": "Parse Topic Suggestions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NEXT_PUBLIC_APP_URL || 'http://localhost:3002' }}/api/topics",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "save-topic",
+      "name": "Save Topic to Database",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Summary of discovered topics\nconst topics = $input.all();\n\nreturn {\n  json: {\n    success: true,\n    totalTopicsDiscovered: topics.length,\n    timestamp: new Date().toISOString(),\n    message: `Successfully discovered ${topics.length} new content topics`,\n    nextStep: 'Review topics at /admin/topics'\n  }\n};"
+      },
+      "id": "summary",
+      "name": "Create Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 300]
+    }
+  ],
+  "connections": {
+    "Schedule - Every Day 6 AM": {
+      "main": [
+        [
+          {
+            "node": "Define Search Topics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Define Search Topics": {
+      "main": [
+        [
+          {
+            "node": "AI Topic Analysis (Gemini)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Topic Analysis (Gemini)": {
+      "main": [
+        [
+          {
+            "node": "Parse Topic Suggestions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Topic Suggestions": {
+      "main": [
+        [
+          {
+            "node": "Save Topic to Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Topic to Database": {
+      "main": [
+        [
+          {
+            "node": "Create Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2026-01-28T00:00:00.000Z",
+  "versionId": "1"
+}

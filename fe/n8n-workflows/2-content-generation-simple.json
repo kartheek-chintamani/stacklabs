@@ -1,0 +1,116 @@
+{
+  "name": "Content Generation - Simple Test",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "topic-approved",
+        "responseMode": "onReceived"
+      },
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "topic-approved"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Create Gemini API request\nconst input = $input.first().json;\nconst topic = input.body || input;\n\nconst topicTitle = topic.topic_title || 'AI Development Tools';\nconst targetAudience = topic.target_audience || 'developers';\nconst keywords = Array.isArray(topic.keywords) ? topic.keywords.join(', ') : 'AI, tools';\n\nconst requestBody = {\n  contents: [{\n    parts: [{\n      text: `You are a technical writer. Write a comprehensive article about: ${topicTitle}\n\nTarget audience: ${targetAudience}\nKeywords: ${keywords}\n\nWrite 1500 words with clear headings.\n\nReturn ONLY this JSON (no markdown, no code blocks):\n{\n  \"title\": \"Article Title Here\",\n  \"subtitle\": \"Subtitle here\",\n  \"content\": \"# Full Article\\n\\nYour content here with ## headings\",\n  \"excerpt\": \"Brief summary\",\n  \"metaDescription\": \"SEO description\",\n  \"tags\": [\"ai\", \"tools\", \"development\"],\n  \"readingTime\": 8,\n  \"keyTakeaways\": [\"Point 1\", \"Point 2\", \"Point 3\"]\n}`\n    }]\n  }],\n  generationConfig: {\n    temperature: 0.7,\n    topP: 0.8,\n    topK: 40,\n    maxOutputTokens: 8192\n  }\n};\n\nreturn {\n  json: {\n    topicId: topic.id,\n    topicTitle: topicTitle,\n    requestBody: requestBody\n  }\n};"
+      },
+      "id": "prepare",
+      "name": "Prepare Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyBGwcKNfNbtoXApx-TBf5OsmZ8QV1016WE",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.requestBody) }}",
+        "options": {}
+      },
+      "id": "gemini",
+      "name": "Call Gemini API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse response and create article\nconst response = $input.first().json;\nconst prepareData = $('Prepare Request').first().json;\n\ntry {\n  console.log('Full response:', JSON.stringify(response, null, 2));\n  \n  // Extract generated text\n  const generatedText = response.candidates[0].content.parts[0].text;\n  console.log('Generated text:', generatedText);\n  \n  // Clean and parse JSON\n  let cleanText = generatedText.trim();\n  cleanText = cleanText.replace(/```json\\s*/g, '').replace(/```\\s*/g, '');\n  cleanText = cleanText.trim();\n  \n  console.log('Clean text:', cleanText);\n  \n  const article = JSON.parse(cleanText);\n  \n  // Create article for database\n  const result = {\n    topic_id: prepareData.topicId,\n    title: article.title,\n    slug: article.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),\n    subtitle: article.subtitle || '',\n    content: article.content,\n    excerpt: article.excerpt || article.content.substring(0, 200),\n    meta_description: article.metaDescription || article.excerpt,\n    author_name: 'AI Content Team',\n    author_avatar: '/avatars/ai-team.jpg',\n    cover_image: '/images/placeholder-article.jpg',\n    reading_time_minutes: article.readingTime || 8,\n    status: 'pending_review',\n    tags: article.tags || ['ai', 'tools'],\n    key_takeaways: article.keyTakeaways || ['Key point 1', 'Key point 2'],\n    quality_report: {\n      overall_score: 85,\n      readability_score: 80,\n      seo_score: 85,\n      originality_score: 90,\n      technical_accuracy: 85,\n      engagement_score: 85\n    }\n  };\n  \n  console.log('Article ready:', JSON.stringify(result, null, 2));\n  return { json: result };\n  \n} catch (error) {\n  console.error('Error:', error.message);\n  console.error('Response:', JSON.stringify(response, null, 2));\n  throw new Error('Failed to parse: ' + error.message);\n}"
+      },
+      "id": "parse",
+      "name": "Parse Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3002/api/articles",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "save",
+      "name": "Save to Database",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $input.first().json;\nconsole.log('Success! Article saved:', result);\nreturn {\n  json: {\n    success: true,\n    message: 'Article generated successfully!',\n    articleId: result.id\n  }\n};"
+      },
+      "id": "success",
+      "name": "Success",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{"node": "Prepare Request", "type": "main", "index": 0}]]
+    },
+    "Prepare Request": {
+      "main": [[{"node": "Call Gemini API", "type": "main", "index": 0}]]
+    },
+    "Call Gemini API": {
+      "main": [[{"node": "Parse Response", "type": "main", "index": 0}]]
+    },
+    "Parse Response": {
+      "main": [[{"node": "Save to Database", "type": "main", "index": 0}]]
+    },
+    "Save to Database": {
+      "main": [[{"node": "Success", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {"executionOrder": "v1"},
+  "staticData": null,
+  "tags": []
+}

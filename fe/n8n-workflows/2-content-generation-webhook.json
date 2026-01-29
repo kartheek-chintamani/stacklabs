@@ -1,0 +1,181 @@
+{
+  "name": "Content Generation - On Topic Approval",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "topic-approved",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook - Topic Approved",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "topic-approved"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract topic data from webhook\nconst topicData = $input.first().json;\n\nreturn {\n  json: {\n    topicId: topicData.id,\n    topicTitle: topicData.topic_title,\n    topicKeywords: topicData.keywords || [],\n    targetAudience: topicData.target_audience || 'developers',\n    contentType: topicData.content_type || 'tutorial',\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "parse-topic",
+      "name": "Parse Topic Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyBGwcKNfNbtoXApx-TBf5OsmZ8QV1016WE",
+        "authentication": "none",
+        "sendQuery": false,
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": []
+        },
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"You are an expert technical content writer for DevTools Nexus, a site reviewing AI productivity tools for developers.\\n\\nGenerate a comprehensive, SEO-optimized article about: {{ $json.topicTitle }}\\n\\nTarget Audience: {{ $json.targetAudience }}\\nContent Type: {{ $json.contentType }}\\nKeywords: {{ $json.topicKeywords.join(', ') }}\\n\\nIMPORTANT REQUIREMENTS:\\n1. Write 2000-2500 words\\n2. Use clear headings (H2, H3)\\n3. Include actionable tips and examples\\n4. Add code snippets where relevant\\n5. Maintain professional but friendly tone\\n6. Include pros/cons sections\\n7. Add comparison tables if comparing tools\\n8. Provide step-by-step tutorials\\n9. Include best practices\\n10. End with practical takeaways\\n\\nFormat the response as JSON:\\n{\\n  \\\"title\\\": \\\"Article title (60 chars max)\\\",\\n  \\\"subtitle\\\": \\\"Engaging subtitle (120 chars)\\\",\\n  \\\"content\\\": \\\"Full markdown article content\\\",\\n  \\\"excerpt\\\": \\\"Brief 150-word summary\\\",\\n  \\\"metaDescription\\\": \\\"SEO description (155 chars max)\\\",\\n  \\\"tags\\\": [\\\"tag1\\\", \\\"tag2\\\", \\\"tag3\\\"],\\n  \\\"readingTime\\\": 10,\\n  \\\"keyTakeaways\\\": [\\\"Point 1\\\", \\\"Point 2\\\", \\\"Point 3\\\"]\\n}\\n\\nGenerate high-quality, original content that provides real value to developers.\"\n    }]\n  }],\n  \"generationConfig\": {\n    \"temperature\": 0.7,\n    \"topP\": 0.8,\n    \"topK\": 40,\n    \"maxOutputTokens\": 8192\n  }\n}",
+        "options": {}
+      },
+      "id": "generate-article",
+      "name": "Generate Article (Gemini)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Gemini response and extract article data\nconst response = $input.first().json;\n\ntry {\n  // Extract text from Gemini response\n  const generatedText = response.candidates[0].content.parts[0].text;\n  \n  // Remove markdown code fences if present\n  const cleanText = generatedText.replace(/```json\\n?|```\\n?/g, '');\n  \n  // Parse JSON\n  const article = JSON.parse(cleanText);\n  \n  // Add metadata\n  const topicData = $('Parse Topic Data').first().json;\n  \n  return {\n    json: {\n      topic_id: topicData.topicId,\n      title: article.title,\n      slug: article.title.toLowerCase()\n        .replace(/[^a-z0-9]+/g, '-')\n        .replace(/(^-|-$)/g, ''),\n      subtitle: article.subtitle,\n      content: article.content,\n      excerpt: article.excerpt,\n      meta_description: article.metaDescription,\n      author_name: 'AI Content Team',\n      author_avatar: '/avatars/ai-team.jpg',\n      cover_image: '/images/placeholder-article.jpg',\n      reading_time_minutes: article.readingTime || 10,\n      status: 'pending_review',\n      published_at: null,\n      tags: article.tags || [],\n      key_takeaways: article.keyTakeaways || [],\n      quality_report: {\n        overall_score: 85,\n        readability_score: 80,\n        seo_score: 85,\n        originality_score: 90,\n        technical_accuracy: 85,\n        engagement_score: 85\n      }\n    }\n  };\n} catch (error) {\n  throw new Error('Failed to parse article: ' + error.message);\n}"
+      },
+      "id": "parse-article",
+      "name": "Parse Article Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NEXT_PUBLIC_APP_URL || 'http://localhost:3002' }}/api/articles",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": []
+        },
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "save-article",
+      "name": "Save Article to Database",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Success response\nconst article = $input.first().json;\n\nreturn {\n  json: {\n    success: true,\n    message: 'Article generated and saved successfully',\n    articleId: article.id,\n    status: 'pending_review',\n    nextStep: 'Review article in admin dashboard'\n  }\n};"
+      },
+      "id": "success-response",
+      "name": "Success Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Error handling\nconst error = $input.first().json;\n\nconsole.error('Content generation failed:', error);\n\nreturn {\n  json: {\n    success: false,\n    error: error.message || 'Unknown error',\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "error-handler",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 500]
+    }
+  ],
+  "connections": {
+    "Webhook - Topic Approved": {
+      "main": [
+        [
+          {
+            "node": "Parse Topic Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Topic Data": {
+      "main": [
+        [
+          {
+            "node": "Generate Article (Gemini)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Article (Gemini)": {
+      "main": [
+        [
+          {
+            "node": "Parse Article Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Article Response": {
+      "main": [
+        [
+          {
+            "node": "Save Article to Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Article to Database": {
+      "main": [
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2026-01-28T00:00:00.000Z",
+  "versionId": "1"
+}

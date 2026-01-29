@@ -1,0 +1,587 @@
+{
+    "name": "LinkGenie - Complete with DB Save",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "deal",
+                "responseMode": "lastNode",
+                "options": {}
+            },
+            "id": "webhook",
+            "name": "Webhook Trigger",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2,
+            "position": [
+                240,
+                300
+            ],
+            "webhookId": "deal"
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://nsfftuhsrjzxfmepfvmk.supabase.co/functions/v1/check-duplicate",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zZmZ0dWhzcmp6eGZtZXBmdm1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0MjIzMjcsImV4cCI6MjA4NDk5ODMyN30.rxmAjFVfPQaCTeNQvrtb7ZURnpY6eB5UsN1pcj3Xh5A"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "url",
+                            "value": "={{ $json.body.url }}"
+                        },
+                        {
+                            "name": "hours",
+                            "value": "24"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "check-dup",
+            "name": "Check Duplicate",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                460,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict"
+                    },
+                    "conditions": [
+                        {
+                            "id": "not-dup",
+                            "leftValue": "={{ $json.is_duplicate }}",
+                            "rightValue": false,
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "equals"
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                },
+                "options": {}
+            },
+            "id": "if-not-dup",
+            "name": "If Not Duplicate",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2,
+            "position": [
+                680,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "assignments": {
+                    "assignments": [
+                        {
+                            "id": "url",
+                            "name": "url",
+                            "value": "={{ $('Webhook Trigger').item.json.body.url }}",
+                            "type": "string"
+                        },
+                        {
+                            "id": "url_hash",
+                            "name": "url_hash",
+                            "value": "={{ $('Check Duplicate').first().json.url_hash }}",
+                            "type": "string"
+                        },
+                        {
+                            "id": "success",
+                            "name": "success",
+                            "value": true,
+                            "type": "boolean"
+                        },
+                        {
+                            "id": "product_title",
+                            "name": "product_title",
+                            "value": "Samsung Galaxy S24 Ultra 5G (Titanium Gray, 12GB, 256GB Storage)",
+                            "type": "string"
+                        },
+                        {
+                            "id": "current_price",
+                            "name": "current_price",
+                            "value": "84999",
+                            "type": "number"
+                        },
+                        {
+                            "id": "original_price",
+                            "name": "original_price",
+                            "value": "129999",
+                            "type": "number"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "mock-data",
+            "name": "Mock Product Data",
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 3.3,
+            "position": [
+                900,
+                220
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://nsfftuhsrjzxfmepfvmk.supabase.co/functions/v1/monetize-link",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zZmZ0dWhzcmp6eGZtZXBmdm1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0MjIzMjcsImV4cCI6MjA4NDk5ODMyN30.rxmAjFVfPQaCTeNQvrtb7ZURnpY6eB5UsN1pcj3Xh5A"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "url",
+                            "value": "={{ $json.url }}"
+                        },
+                        {
+                            "name": "subid",
+                            "value": "=auto_{{ $now.format('YYYYMMDDHHmmss') }}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "monetize",
+            "name": "Monetize Link",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                1120,
+                220
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const mockData = $('Mock Product Data').first().json;\nconst monetizeData = $('Monetize Link').first().json;\n\nconst affiliateLink = monetizeData.affiliate_url || mockData.url;\nconst urlHash = mockData.url_hash;\n\nconst currentPrice = mockData.current_price;\nconst originalPrice = mockData.original_price;\n\nconst discount = originalPrice > currentPrice \n  ? Math.round(((originalPrice - currentPrice) / originalPrice) * 100)\n  : 0;\n\nconst title = mockData.product_title;\nconst message = `<b>${title}</b>\\n\\n` +\n  `🔥 <b>Deal Alert!</b>\\n` +\n  (discount > 0 \n    ? `💰 Only <b>₹${currentPrice.toLocaleString('en-IN')}</b> <s>₹${originalPrice.toLocaleString('en-IN')}</s> (${discount}% OFF)\\n\\n` \n    : `💰 Price: <b>₹${currentPrice.toLocaleString('en-IN')}</b>\\n\\n`) +\n  `👇 Grab it now:\\n` +\n  `<a href=\"${affiliateLink}\">👉 CLICK HERE TO BUY</a>`;\n\nreturn {\n  json: {\n    chat_id: '@deals_fiesta',\n    text: message,\n    parse_mode: 'HTML',\n    disable_web_page_preview: false,\n    url: mockData.url,\n    url_hash: urlHash,\n    affiliate_url: affiliateLink,\n    product_title: title\n  }\n};"
+            },
+            "id": "format",
+            "name": "Format Message",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1340,
+                220
+            ]
+        },
+        {
+            "parameters": {
+                "chatId": "={{ $json.chat_id }}",
+                "text": "={{ $json.text }}",
+                "additionalFields": {
+                    "parse_mode": "HTML",
+                    "disable_web_page_preview": false
+                }
+            },
+            "id": "telegram",
+            "name": "Post to Telegram",
+            "type": "n8n-nodes-base.telegram",
+            "typeVersion": 1.2,
+            "position": [
+                1560,
+                220
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://nsfftuhsrjzxfmepfvmk.supabase.co/rest/v1/discovered_links",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zZmZ0dWhzcmp6eGZtZXBmdm1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0MjIzMjcsImV4cCI6MjA4NDk5ODMyN30.rxmAjFVfPQaCTeNQvrtb7ZURnpY6eB5UsN1pcj3Xh5A"
+                        },
+                        {
+                            "name": "apikey",
+                            "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zZmZ0dWhzcmp6eGZtZXBmdm1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0MjIzMjcsImV4cCI6MjA4NDk5ODMyN30.rxmAjFVfPQaCTeNQvrtb7ZURnpY6eB5UsN1pcj3Xh5A"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        },
+                        {
+                            "name": "Prefer",
+                            "value": "return=minimal"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "url",
+                            "value": "={{ $('Format Message').first().json.url }}"
+                        },
+                        {
+                            "name": "url_hash",
+                            "value": "={{ $('Format Message').first().json.url_hash }}"
+                        },
+                        {
+                            "name": "source",
+                            "value": "webhook"
+                        },
+                        {
+                            "name": "status",
+                            "value": "posted"
+                        },
+                        {
+                            "name": "affiliate_url",
+                            "value": "={{ $('Format Message').first().json.affiliate_url }}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "save-db",
+            "name": "Save to Database",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                1780,
+                220
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://nsfftuhsrjzxfmepfvmk.supabase.co/functions/v1/log-workflow",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zZmZ0dWhzcmp6eGZtZXBmdm1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0MjIzMjcsImV4cCI6MjA4NDk5ODMyN30.rxmAjFVfPQaCTeNQvrtb7ZURnpY6eB5UsN1pcj3Xh5A"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "workflow_name",
+                            "value": "deal-automation"
+                        },
+                        {
+                            "name": "status",
+                            "value": "success"
+                        },
+                        {
+                            "name": "deals_found",
+                            "value": "1"
+                        },
+                        {
+                            "name": "deals_processed",
+                            "value": "1"
+                        },
+                        {
+                            "name": "deals_posted",
+                            "value": "1"
+                        },
+                        {
+                            "name": "deals_rejected",
+                            "value": "0"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "log-workflow",
+            "name": "Log Workflow Success",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                2000,
+                220
+            ]
+        },
+        {
+            "parameters": {
+                "assignments": {
+                    "assignments": [
+                        {
+                            "id": "success",
+                            "name": "success",
+                            "value": true,
+                            "type": "boolean"
+                        },
+                        {
+                            "id": "message",
+                            "name": "message",
+                            "value": "Posted to Telegram successfully!",
+                            "type": "string"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "response-success",
+            "name": "Return Success",
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 3.3,
+            "position": [
+                2220,
+                220
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://nsfftuhsrjzxfmepfvmk.supabase.co/functions/v1/log-workflow",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zZmZ0dWhzcmp6eGZtZXBmdm1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0MjIzMjcsImV4cCI6MjA4NDk5ODMyN30.rxmAjFVfPQaCTeNQvrtb7ZURnpY6eB5UsN1pcj3Xh5A"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "workflow_name",
+                            "value": "deal-automation"
+                        },
+                        {
+                            "name": "status",
+                            "value": "failed"
+                        },
+                        {
+                            "name": "deals_found",
+                            "value": "1"
+                        },
+                        {
+                            "name": "deals_processed",
+                            "value": "0"
+                        },
+                        {
+                            "name": "deals_posted",
+                            "value": "0"
+                        },
+                        {
+                            "name": "deals_rejected",
+                            "value": "1"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "log-dup",
+            "name": "Log Duplicate Rejected",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                900,
+                380
+            ]
+        },
+        {
+            "parameters": {
+                "assignments": {
+                    "assignments": [
+                        {
+                            "id": "success",
+                            "name": "success",
+                            "value": false,
+                            "type": "boolean"
+                        },
+                        {
+                            "id": "reason",
+                            "name": "reason",
+                            "value": "duplicate",
+                            "type": "string"
+                        },
+                        {
+                            "id": "message",
+                            "name": "message",
+                            "value": "This product was already posted in the last 24 hours",
+                            "type": "string"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "response-dup",
+            "name": "Return Duplicate",
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 3.3,
+            "position": [
+                1120,
+                380
+            ]
+        }
+    ],
+    "connections": {
+        "Webhook Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Check Duplicate",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Check Duplicate": {
+            "main": [
+                [
+                    {
+                        "node": "If Not Duplicate",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "If Not Duplicate": {
+            "main": [
+                [
+                    {
+                        "node": "Mock Product Data",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Log Duplicate Rejected",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Mock Product Data": {
+            "main": [
+                [
+                    {
+                        "node": "Monetize Link",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Monetize Link": {
+            "main": [
+                [
+                    {
+                        "node": "Format Message",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Format Message": {
+            "main": [
+                [
+                    {
+                        "node": "Post to Telegram",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Post to Telegram": {
+            "main": [
+                [
+                    {
+                        "node": "Save to Database",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Save to Database": {
+            "main": [
+                [
+                    {
+                        "node": "Log Workflow Success",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Log Workflow Success": {
+            "main": [
+                [
+                    {
+                        "node": "Return Success",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Log Duplicate Rejected": {
+            "main": [
+                [
+                    {
+                        "node": "Return Duplicate",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "pinData": {},
+    "settings": {
+        "executionOrder": "v1"
+    },
+    "staticData": null,
+    "tags": [],
+    "triggerCount": 1,
+    "updatedAt": "2026-01-27T18:00:00.000Z",
+    "versionId": "8"
+}

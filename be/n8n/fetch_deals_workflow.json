@@ -1,0 +1,108 @@
+{
+    "name": "LinkGenie - Fetch Deals",
+    "nodes": [
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "hours",
+                            "hoursInterval": 6
+                        }
+                    ]
+                }
+            },
+            "name": "Schedule",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1,
+            "position": [
+                250,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Mock Data Generation (Replace with HTTP Request to actual API)\nreturn [\n  {\n    json: {\n      title: 'Apple iPhone 15 (128 GB) - Black',\n      original_url: 'https://www.amazon.in/dp/B0CHX1W1XY',\n      image_url: 'https://m.media-amazon.com/images/I/71d7rfSl0wL._SL1500_.jpg',\n      category: 'electronics',\n      original_price: 79900,\n      discounted_price: 71290,\n      discount_percent: 11,\n      merchant_name: 'Amazon',\n      description: 'Dynamic Island, A16 Bionic chip, 48MP Main Camera',\n      expires_at: new Date(Date.now() + 86400000).toISOString()\n    }\n  },\n  {\n    json: {\n      title: 'Sony WH-1000XM5 Wireless Noise Cancelling Headphones',\n      original_url: 'https://www.amazon.in/Sony-WH-1000XM5-Wireless-Cancelling-Headphones/dp/B09XS7JWHH',\n      image_url: 'https://m.media-amazon.com/images/I/61+eCL1DoXL._SL1500_.jpg',\n      category: 'electronics',\n      original_price: 34990,\n      discounted_price: 26990,\n      discount_percent: 23,\n      merchant_name: 'Amazon',\n      description: 'Best noise cancellation, 30 hours battery life',\n      expires_at: new Date(Date.now() + 86400000 * 2).toISOString()\n    }\n  }\n];"
+            },
+            "name": "Fetch Mock Deals",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 1,
+            "position": [
+                450,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Logic to transform links to affiliate links\n// This mimics the logic from useAffiliatePrograms.ts\n\nconst items = $input.all();\nconst results = [];\n\nconst programs = [ \n    // Ideally fetch this from Supabase in a previous node, hardcoded for demo\n    { program_type: 'amazon', affiliate_id: 'linkgenie-21', tracking_param: 'tag' },\n    { program_type: 'flipkart', affiliate_id: 'linkgenie_fk', tracking_param: 'affid' }\n];\n\nfor (const item of items) {\n    const deal = item.json;\n    let affiliateUrl = deal.original_url;\n    \n    // Transformation Logic\n    const urlLower = deal.original_url.toLowerCase();\n    let matchedProgram = null;\n\n    if (urlLower.includes('amazon')) {\n        matchedProgram = programs.find(p => p.program_type === 'amazon');\n    } else if (urlLower.includes('flipkart')) {\n        matchedProgram = programs.find(p => p.program_type === 'flipkart');\n    }\n\n    if (matchedProgram) {\n        try {\n            const url = new URL(deal.original_url);\n            url.searchParams.set(matchedProgram.tracking_param, matchedProgram.affiliate_id);\n            affiliateUrl = url.toString();\n        } catch (e) {}\n    }\n\n    results.push({\n        json: {\n            ...deal,\n            affiliate_url: affiliateUrl,\n            is_favorite: false,\n            // Default user content\n            user_id: 'USER_ID_PLACEHOLDER' // Replace with actual user ID\n        }\n    });\n}\n\nreturn results;"
+            },
+            "name": "Add Affiliate Tags",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 1,
+            "position": [
+                650,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "table": {
+                    "__rl": true,
+                    "value": "deals",
+                    "mode": "list",
+                    "cachedResultName": "deals"
+                },
+                "columns": "title,original_url,affiliate_url,image_url,category,original_price,discounted_price,discount_percent,merchant_name,description,expires_at,user_id",
+                "options": {}
+            },
+            "name": "Supabase Insert",
+            "type": "n8n-nodes-base.supabase",
+            "typeVersion": 1,
+            "position": [
+                850,
+                300
+            ],
+            "credentials": {
+                "supabaseApi": {
+                    "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+                    "name": "Supabase account"
+                }
+            }
+        }
+    ],
+    "connections": {
+        "Schedule": {
+            "main": [
+                [
+                    {
+                        "node": "Fetch Mock Deals",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Fetch Mock Deals": {
+            "main": [
+                [
+                    {
+                        "node": "Add Affiliate Tags",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Add Affiliate Tags": {
+            "main": [
+                [
+                    {
+                        "node": "Supabase Insert",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}
