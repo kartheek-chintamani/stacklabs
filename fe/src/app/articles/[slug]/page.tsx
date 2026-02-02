@@ -1,23 +1,47 @@
-// AI Generated Code by Deloitte + Cursor (BEGIN)
 import Link from 'next/link';
 import { Clock, Eye, Star, ArrowLeft, Share2 } from 'lucide-react';
-import { MOCK_ARTICLES } from '@/lib/mockData';
 import { notFound } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
+import { createAdminClient } from '@/lib/supabase';
 
+// Generate params for static generation (optional, can be fully dynamic)
 export async function generateStaticParams() {
-  return MOCK_ARTICLES.map((article) => ({
+  const supabase = createAdminClient();
+  const { data: articles } = await supabase.from('articles').select('slug').eq('status', 'published');
+  return (articles || []).map((article) => ({
     slug: article.slug,
   }));
 }
 
+async function getArticle(slug: string) {
+  const supabase = createAdminClient();
+  const { data: article } = await supabase
+    .from('articles')
+    .select('*')
+    .eq('slug', slug)
+    .single(); // Removed status check to allow previewing drafts if needed, or strictly published?
+  // Let's allow drafts but maybe show a warning? 
+  // For now, simple fetch.
+  return article;
+}
+
 export default async function ArticlePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const article = MOCK_ARTICLES.find(a => a.slug === slug);
+  const article = await getArticle(slug);
 
   if (!article) {
     notFound();
   }
+
+  // Map DB fields to UI
+  const coverImage = article.generation_metadata?.cover_image;
+  const authorName = article.author_name || 'AI Content Team';
+  const authorAvatar = article.author_avatar || '/avatars/ai-team.jpg';
+  const publishedDate = article.published_at || article.created_at;
+  const rating = article.quality_report?.overall_score ? (article.quality_report.overall_score / 20).toFixed(1) : '4.5';
+  const views = article.total_views || 0;
+  const readTime = article.reading_time_minutes ? `${article.reading_time_minutes} min` : '5 min';
+  const tags = article.tags || [];
 
   return (
     <div className="bg-white">
@@ -34,19 +58,19 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
         <div className="mb-8">
           <div className="flex flex-wrap items-center gap-3 mb-6">
             <span className="bg-blue-100 text-blue-700 px-4 py-1 rounded-full text-sm font-medium">
-              {article.category}
+              {article.niche_category || 'Article'}
             </span>
             <div className="flex items-center gap-1 text-sm text-gray-600">
               <Clock className="w-4 h-4" />
-              {article.readTime}
+              {readTime}
             </div>
             <div className="flex items-center gap-1 text-sm text-gray-600">
               <Eye className="w-4 h-4" />
-              {article.views.toLocaleString()} views
+              {views.toLocaleString()} views
             </div>
             <div className="flex items-center gap-1 text-sm text-gray-600">
               <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-              {article.rating} rating
+              {rating} rating
             </div>
           </div>
 
@@ -55,20 +79,20 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
           </h1>
 
           <p className="text-xl text-gray-600 mb-8 leading-relaxed">
-            {article.excerpt}
+            {article.meta_description || article.excerpt}
           </p>
 
           {/* Author Info */}
           <div className="flex items-center justify-between pb-8 border-b border-gray-200">
             <div className="flex items-center gap-4">
-              <img 
-                src={article.authorImage}
-                alt={article.author}
+              <img
+                src={authorAvatar}
+                alt={authorName}
                 className="w-12 h-12 rounded-full"
               />
               <div>
-                <div className="font-semibold text-gray-900">{article.author}</div>
-                <div className="text-sm text-gray-500">Published on {new Date(article.publishedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
+                <div className="font-semibold text-gray-900">{authorName}</div>
+                <div className="text-sm text-gray-500">Published on {new Date(publishedDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
               </div>
             </div>
             <button className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
@@ -79,26 +103,28 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
         </div>
 
         {/* Featured Image */}
-        <div className="mb-12 rounded-2xl overflow-hidden">
-          <img 
-            src={article.featuredImage}
-            alt={article.title}
-            className="w-full h-auto"
-          />
-        </div>
+        {coverImage && (
+          <div className="mb-12 rounded-2xl overflow-hidden bg-gray-100">
+            <img
+              src={coverImage}
+              alt={article.title}
+              className="w-full h-auto"
+            />
+          </div>
+        )}
 
         {/* Article Content */}
         <div className="prose prose-lg max-w-none">
           <ReactMarkdown
             components={{
-              h1: ({node, ...props}) => <h1 className="text-3xl font-bold mt-8 mb-4 text-gray-900" {...props} />,
-              h2: ({node, ...props}) => <h2 className="text-2xl font-bold mt-8 mb-4 text-gray-900" {...props} />,
-              h3: ({node, ...props}) => <h3 className="text-xl font-bold mt-6 mb-3 text-gray-900" {...props} />,
-              p: ({node, ...props}) => <p className="mb-4 text-gray-700 leading-relaxed" {...props} />,
-              ul: ({node, ...props}) => <ul className="list-disc list-inside mb-4 space-y-2 text-gray-700" {...props} />,
-              ol: ({node, ...props}) => <ol className="list-decimal list-inside mb-4 space-y-2 text-gray-700" {...props} />,
-              strong: ({node, ...props}) => <strong className="font-bold text-gray-900" {...props} />,
-              code: ({node, ...props}) => <code className="bg-gray-100 px-2 py-1 rounded text-sm font-mono text-gray-800" {...props} />,
+              h1: ({ node, ...props }) => <h1 className="text-3xl font-bold mt-8 mb-4 text-gray-900" {...props} />,
+              h2: ({ node, ...props }) => <h2 className="text-2xl font-bold mt-8 mb-4 text-gray-900" {...props} />,
+              h3: ({ node, ...props }) => <h3 className="text-xl font-bold mt-6 mb-3 text-gray-900" {...props} />,
+              p: ({ node, ...props }) => <p className="mb-4 text-gray-700 leading-relaxed" {...props} />,
+              ul: ({ node, ...props }) => <ul className="list-disc list-inside mb-4 space-y-2 text-gray-700" {...props} />,
+              ol: ({ node, ...props }) => <ol className="list-decimal list-inside mb-4 space-y-2 text-gray-700" {...props} />,
+              strong: ({ node, ...props }) => <strong className="font-bold text-gray-900" {...props} />,
+              code: ({ node, ...props }) => <code className="bg-gray-100 px-2 py-1 rounded text-sm font-mono text-gray-800" {...props} />,
             }}
           >
             {article.content}
@@ -106,54 +132,23 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
         </div>
 
         {/* Tags */}
-        <div className="mt-12 pt-8 border-t border-gray-200">
-          <h3 className="text-sm font-semibold text-gray-500 mb-4 uppercase">Tags</h3>
-          <div className="flex flex-wrap gap-2">
-            {article.tags.map((tag, index) => (
-              <Link 
-                key={index}
-                href={`/tags/${tag.toLowerCase().replace(/\s+/g, '-')}`}
-                className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-full text-sm transition-colors"
-              >
-                {tag}
-              </Link>
-            ))}
+        {tags.length > 0 && (
+          <div className="mt-12 pt-8 border-t border-gray-200">
+            <h3 className="text-sm font-semibold text-gray-500 mb-4 uppercase">Tags</h3>
+            <div className="flex flex-wrap gap-2">
+              {tags.map((tag: string, index: number) => (
+                <Link
+                  key={index}
+                  href={`/tags/${tag.toLowerCase().replace(/\s+/g, '-')}`}
+                  className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-full text-sm transition-colors"
+                >
+                  {tag}
+                </Link>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </article>
-
-      {/* Related Articles */}
-      <div className="bg-gray-50 py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-8">More Articles</h2>
-          <div className="grid md:grid-cols-3 gap-8">
-            {MOCK_ARTICLES.filter(a => a.id !== article.id).slice(0, 3).map((relatedArticle) => (
-              <Link 
-                key={relatedArticle.id}
-                href={`/articles/${relatedArticle.slug}`}
-                className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow"
-              >
-                <div className="relative h-48">
-                  <img 
-                    src={relatedArticle.featuredImage}
-                    alt={relatedArticle.title}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <div className="p-6">
-                  <h3 className="text-lg font-bold text-gray-900 mb-2 line-clamp-2 hover:text-blue-600 transition-colors">
-                    {relatedArticle.title}
-                  </h3>
-                  <p className="text-gray-600 text-sm line-clamp-2">
-                    {relatedArticle.excerpt}
-                  </p>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
-// AI Generated Code by Deloitte + Cursor (END)

@@ -34,6 +34,9 @@ export default function Header() {
             <Link href="/about" className="text-gray-700 hover:text-blue-600 font-medium transition-colors">
               About
             </Link>
+            <Link href="/contact" className="text-gray-700 hover:text-blue-600 font-medium transition-colors">
+              Contact
+            </Link>
             <Link href="/admin/topics" className="text-gray-700 hover:text-blue-600 font-medium transition-colors">
               Admin
             </Link>
@@ -71,6 +74,9 @@ export default function Header() {
               </Link>
               <Link href="/about" className="text-gray-700 hover:text-blue-600 font-medium py-2">
                 About
+              </Link>
+              <Link href="/contact" className="text-gray-700 hover:text-blue-600 font-medium py-2">
+                Contact
               </Link>
               <Link href="/admin/topics" className="text-gray-700 hover:text-blue-600 font-medium py-2">
                 Admin

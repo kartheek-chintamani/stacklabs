@@ -1,0 +1,233 @@
+{
+    "name": "Topic Discovery - Daily Scraper (Auto-Loop)",
+    "nodes": [
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "hours",
+                            "triggerAtHour": 9
+                        }
+                    ]
+                }
+            },
+            "id": "schedule-trigger",
+            "name": "Daily Schedule (9AM)",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1.1,
+            "position": [
+                250,
+                300
+            ]
+        },
+        {
+            "parameters": {},
+            "id": "manual-trigger",
+            "name": "Manual Trigger",
+            "type": "n8n-nodes-base.manualTrigger",
+            "typeVersion": 1,
+            "position": [
+                250,
+                460
+            ]
+        },
+        {
+            "parameters": {
+                "url": "https://news.google.com/rss/search?q=AI+tools+for+developers+productivity&hl=en-US&gl=US&ceid=US:en",
+                "responseFormat": "string",
+                "options": {
+                    "responsePropertyName": "data"
+                }
+            },
+            "id": "fetch-rss",
+            "name": "Fetch Google News RSS",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                450,
+                380
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Manual XML Parsing (Regex) to avoid XML Node issues\nconst xml = $input.first().json.data;\nconst items = [];\n\n// Regex to match <item>...</item>\nconst itemRegex = /<item>([\\s\\S]*?)<\\/item>/g;\nlet match;\n\nwhile ((match = itemRegex.exec(xml)) !== null) {\n  const content = match[1];\n  \n  // Extract fields\n  const titleMatch = /<title>([\\s\\S]*?)<\\/title>/.exec(content);\n  const linkMatch = /<link>([\\s\\S]*?)<\\/link>/.exec(content);\n  const descMatch = /<description>([\\s\\S]*?)<\\/description>/.exec(content);\n  const dateMatch = /<pubDate>([\\s\\S]*?)<\\/pubDate>/.exec(content);\n\n  if (titleMatch && linkMatch) {\n    items.push({\n      title: titleMatch[1].replace(/<!\\[CDATA\\[/g, '').replace(/\\]\\]>/g, ''),\n      link: linkMatch[1],\n      description: descMatch ? descMatch[1].replace(/<[^>]*>/g, '') : '',\n      pubDate: dateMatch ? dateMatch[1] : ''\n    });\n  }\n}\n\n// Return top 20\nreturn {\n  json: {\n    newsItems: items.slice(0, 20)\n  }\n};"
+            },
+            "id": "simplify-rss",
+            "name": "Parse & Extract Top 20",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                650,
+                380
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=AIzaSyA_LWYIgzVBN00LRimeKfL-KxV19S_Ydxg",
+                "authentication": "none",
+                "sendQuery": false,
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": []
+                },
+                "specifyBody": "json",
+                "jsonBody": "={{ {\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"You are an Expert Editor for a Developer Productivity Blog.\\n\\nReview the following news list and IDENTIFY tools/topics that are specifically 'AI Productivity Tools for Developers'.\\n\\nDiscard general news, politics, financial news, or minor updates.\\nFocus on new tools, major AI coding assistant updates, or productivity frameworks.\\n\\nInput News List:\\n\" + JSON.stringify($json.newsItems) + \"\\n\\nOutput a JSON list of VALID topics only. Format:\\n{\\n  \\\"topics\\\": [\\n    {\\n      \\\"topic_title\\\": \\\"Clear, catchy title\\\",\\n      \\\"topic_description\\\": \\\"Why this is useful for developers (2 sentences)\\\",\\n      \\\"source_url\\\": \\\"Original link\\\",\\n      \\\"quality_score\\\": 85, // 0-100 relevance score\\n      \\\"niche_category\\\": \\\"AI productivity tools for developers\\\"\\n    }\\n  ]\\n}\"\n    }]\n  }],\n  \"generationConfig\": {\n    \"temperature\": 0.4,\n    \"topP\": 0.8,\n    \"topK\": 40,\n    \"maxOutputTokens\": 8192,\n    \"responseMimeType\": \"application/json\"\n  }\n} }}",
+                "options": {}
+            },
+            "id": "gemini-filter",
+            "name": "Gemini - Filter & Rank",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                850,
+                380
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Parse Gemini Response\nconst response = $input.first().json;\ntry {\n  const rawText = response.candidates[0].content.parts[0].text;\n  const parsed = JSON.parse(rawText);\n  \n  return parsed.topics.map(topic => ({\n    json: topic\n  }));\n} catch (e) {\n  return { json: { error: e.message } };\n}"
+            },
+            "id": "parse-gemini",
+            "name": "Parse Filtered Topics",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1050,
+                380
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://192.168.29.102:3000/api/topics",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "topic_title",
+                            "value": "={{ $json.topic_title }}"
+                        },
+                        {
+                            "name": "topic_description",
+                            "value": "={{ $json.topic_description }}"
+                        },
+                        {
+                            "name": "niche_category",
+                            "value": "={{ $json.niche_category }}"
+                        },
+                        {
+                            "name": "quality_score",
+                            "value": "={{ $json.quality_score }}"
+                        },
+                        {
+                            "name": "source_url",
+                            "value": "={{ $json.source_url }}"
+                        },
+                        {
+                            "name": "discovered_via",
+                            "value": "google_news_rss"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "save-topic",
+            "name": "Save to Database",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                1250,
+                380
+            ]
+        }
+    ],
+    "connections": {
+        "Daily Schedule (9AM)": {
+            "main": [
+                [
+                    {
+                        "node": "Fetch Google News RSS",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Manual Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Fetch Google News RSS",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Fetch Google News RSS": {
+            "main": [
+                [
+                    {
+                        "node": "Parse & Extract Top 20",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Parse & Extract Top 20": {
+            "main": [
+                [
+                    {
+                        "node": "Gemini - Filter & Rank",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Gemini - Filter & Rank": {
+            "main": [
+                [
+                    {
+                        "node": "Parse Filtered Topics",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Parse Filtered Topics": {
+            "main": [
+                [
+                    {
+                        "node": "Save to Database",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {}
+}

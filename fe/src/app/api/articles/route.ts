@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
     const supabase = createAdminClient();
-    
+
     let query = supabase
       .from('articles')
       .select('*')
@@ -66,6 +66,46 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('API error:', error);
     return NextResponse.json({ error: 'Failed to create article' }, { status: 500 });
+  }
+}
+
+// PATCH /api/articles - Update an article
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const supabase = createAdminClient();
+
+    if (!body.id) {
+      return NextResponse.json({ error: 'Article ID is required' }, { status: 400 });
+    }
+
+    const updates: any = {};
+
+    // Allow updating status (e.g. 'published')
+    if (body.status) updates.status = body.status;
+    if (body.title) updates.title = body.title;
+    if (body.content) updates.content = body.content;
+
+    // Update generation_metadata to store cover image
+    if (body.cover_image) {
+      const { data: current } = await supabase.from('articles').select('generation_metadata').eq('id', body.id).single();
+      const meta = current?.generation_metadata || {};
+      updates.generation_metadata = { ...meta, cover_image: body.cover_image };
+    }
+
+    const { data: article, error } = await supabase
+      .from('articles')
+      .update(updates)
+      .eq('id', body.id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return NextResponse.json({ article });
+
+  } catch (error: any) {
+    console.error('API error:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 // AI Generated Code by Deloitte + Cursor (END)

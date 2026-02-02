@@ -1,0 +1,190 @@
+{
+    "name": "Social Media Generator",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "article-published",
+                "responseMode": "onReceived",
+                "options": {}
+            },
+            "id": "webhook-trigger",
+            "name": "Webhook - Article Published",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                250,
+                300
+            ],
+            "webhookId": "article-published"
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=AIzaSyA_LWYIgzVBN00LRimeKfL-KxV19S_Ydxg",
+                "authentication": "none",
+                "sendQuery": false,
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": []
+                },
+                "specifyBody": "json",
+                "jsonBody": "={{ {\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"You are a Social Media Manager.\\n\\nWrite social posts for this new article:\\nTitle: \" + $json.body.title + \"\\nSummary: \" + ($json.body.excerpt || $json.body.title) + \"\\nLink: \" + ($json.body.url || 'https://devtoolsnexus.com/blog/' + $json.body.slug) + \"\\n\\nOutput JSON:\\n{\\n  \\\"twitter\\\": \\\"Tweet text with hashtags (max 280 chars)\\\",\\n  \\\"linkedin\\\": \\\"Professional post text with hashtags\\\"\\n}\"\n    }]\n  }],\n  \"generationConfig\": {\n    \"temperature\": 0.7,\n    \"topP\": 0.8,\n    \"topK\": 40,\n    \"maxOutputTokens\": 2048,\n    \"responseMimeType\": \"application/json\"\n  }\n} }}",
+                "options": {}
+            },
+            "id": "gemini-social",
+            "name": "Gemini - Generate Posts",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                450,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const response = $input.first().json;\nconst rawText = response.candidates[0].content.parts[0].text;\nconst posts = JSON.parse(rawText);\n\n// Pass original article data along\nconst article = $('Webhook - Article Published').first().json.body;\n\nreturn {\n  json: {\n    posts: posts,\n    article_id: article.id || article.article_id\n  }\n};"
+            },
+            "id": "parse-posts",
+            "name": "Parse Posts",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                650,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://192.168.29.102:3000/api/social-posts",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "article_id",
+                            "value": "={{ $json.article_id }}"
+                        },
+                        {
+                            "name": "platform",
+                            "value": "twitter"
+                        },
+                        {
+                            "name": "post_content",
+                            "value": "={{ $json.posts.twitter }}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "save-twitter",
+            "name": "Save Twitter Post",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                850,
+                200
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://192.168.29.102:3000/api/social-posts",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "article_id",
+                            "value": "={{ $json.article_id }}"
+                        },
+                        {
+                            "name": "platform",
+                            "value": "linkedin"
+                        },
+                        {
+                            "name": "post_content",
+                            "value": "={{ $json.posts.linkedin }}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "save-linkedin",
+            "name": "Save LinkedIn Post",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                850,
+                400
+            ]
+        }
+    ],
+    "connections": {
+        "Webhook - Article Published": {
+            "main": [
+                [
+                    {
+                        "node": "Gemini - Generate Posts",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Gemini - Generate Posts": {
+            "main": [
+                [
+                    {
+                        "node": "Parse Posts",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Parse Posts": {
+            "main": [
+                [
+                    {
+                        "node": "Save Twitter Post",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Save LinkedIn Post",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {}
+}

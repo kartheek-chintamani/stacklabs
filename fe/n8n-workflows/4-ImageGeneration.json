@@ -1,0 +1,140 @@
+{
+    "name": "Image Generation (Pollinations)",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "article-created",
+                "responseMode": "onReceived",
+                "options": {}
+            },
+            "id": "webhook-trigger",
+            "name": "Webhook - Article Created",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                250,
+                300
+            ],
+            "webhookId": "article-created"
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=AIzaSyA_LWYIgzVBN00LRimeKfL-KxV19S_Ydxg",
+                "authentication": "none",
+                "sendQuery": false,
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": []
+                },
+                "specifyBody": "json",
+                "jsonBody": "={{ {\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"Create a vivid, cinematic AI image prompt for a hero image for this article.\\n\\nTitle: \" + $json.body.title + \"\\nSummary: \" + ($json.body.excerpt || '') + \"\\n\\nOutput JSON:\\n{\\n  \\\"prompt\\\": \\\"A futuristic close-up of... style of... (max 30 words)\\\"\\n}\"\n    }]\n  }],\n  \"generationConfig\": {\n    \"temperature\": 0.7,\n    \"topP\": 0.8,\n    \"topK\": 40,\n    \"maxOutputTokens\": 1024,\n    \"responseMimeType\": \"application/json\"\n  }\n} }}",
+                "options": {}
+            },
+            "id": "gemini-prompt",
+            "name": "Gemini - Generate Prompt",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                450,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const response = $input.first().json;\nconst rawText = response.candidates[0].content.parts[0].text;\nconst parsed = JSON.parse(rawText);\n\n// Get Article ID from webhook\nconst article = $('Webhook - Article Created').first().json.body;\n\n// Construct Pollinations URL\nconst prompt = parsed.prompt;\nconst encoded = encodeURIComponent(prompt);\nconst imageUrl = `https://image.pollinations.ai/prompt/${encoded}?width=1280&height=720&model=flux&nologo=true`;\n\nreturn {\n  json: {\n    image_url: imageUrl,\n    article_id: article.id || article.article_id\n  }\n};"
+            },
+            "id": "construct-url",
+            "name": "Construct Image URL",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                650,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "PATCH",
+                "url": "http://192.168.29.102:3000/api/articles",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "id",
+                            "value": "={{ $json.article_id }}"
+                        },
+                        {
+                            "name": "cover_image",
+                            "value": "={{ $json.image_url }}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "update-article",
+            "name": "Update Article",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                850,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "Webhook - Article Created": {
+            "main": [
+                [
+                    {
+                        "node": "Gemini - Generate Prompt",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Gemini - Generate Prompt": {
+            "main": [
+                [
+                    {
+                        "node": "Construct Image URL",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Construct Image URL": {
+            "main": [
+                [
+                    {
+                        "node": "Update Article",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {}
+}

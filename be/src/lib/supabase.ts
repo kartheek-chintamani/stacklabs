@@ -1,27 +1,32 @@
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
-if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
-  throw new Error('Missing env.NEXT_PUBLIC_SUPABASE_URL');
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+if (!supabaseUrl) {
+  throw new Error('Missing env.VITE_SUPABASE_URL');
 }
-if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-  throw new Error('Missing env.NEXT_PUBLIC_SUPABASE_ANON_KEY');
+if (!supabaseAnonKey) {
+  throw new Error('Missing env.VITE_SUPABASE_PUBLISHABLE_KEY');
 }
 
+// Default supabase client instance
+export const supabase = createSupabaseClient(supabaseUrl, supabaseAnonKey);
+
 export const createClient = () =>
-  createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  );
+  createSupabaseClient(supabaseUrl, supabaseAnonKey);
 
 // For server-side with service role key
 export const createAdminClient = () => {
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    throw new Error('Missing env.SUPABASE_SERVICE_ROLE_KEY');
+  const serviceRoleKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!serviceRoleKey) {
+    throw new Error('Missing env.VITE_SUPABASE_SERVICE_ROLE_KEY');
   }
-  
+
   return createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    supabaseUrl,
+    serviceRoleKey,
     {
       auth: {
         autoRefreshToken: false,
