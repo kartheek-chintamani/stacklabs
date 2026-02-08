@@ -1,91 +1,104 @@
-// AI Generated Code by Deloitte + Cursor (BEGIN)
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Search, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 
 export default function Header() {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const router = useRouter();
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+      setIsMobileMenuOpen(false);
+    }
+  };
 
   return (
-    <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+    <header className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          {/* Logo */}
-          <Link href="/" className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-xl">N</span>
+          {/* 1. LOGO */}
+          <Link href="/" className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">
+              N
             </div>
             <span className="text-xl font-bold text-gray-900">DevTools Nexus</span>
           </Link>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-8">
-            <Link href="/articles" className="text-gray-700 hover:text-blue-600 font-medium transition-colors">
+          {/* 2. DESKTOP NAVIGATION (Hidden on Mobile) */}
+          <nav className="hidden md:flex items-center gap-6">
+            <Link href="/articles" className="text-gray-600 hover:text-blue-600 font-medium">
               Articles
             </Link>
-            <Link href="/tools" className="text-gray-700 hover:text-blue-600 font-medium transition-colors">
-              Tools
-            </Link>
-            <Link href="/categories" className="text-gray-700 hover:text-blue-600 font-medium transition-colors">
+            <Link href="/categories" className="text-gray-600 hover:text-blue-600 font-medium">
               Categories
             </Link>
-            <Link href="/about" className="text-gray-700 hover:text-blue-600 font-medium transition-colors">
+            <Link href="/tools" className="text-gray-600 hover:text-blue-600 font-medium">
+              Tools
+            </Link>
+            <Link href="/about" className="text-gray-600 hover:text-blue-600 font-medium">
               About
-            </Link>
-            <Link href="/contact" className="text-gray-700 hover:text-blue-600 font-medium transition-colors">
-              Contact
-            </Link>
-            <Link href="/admin/topics" className="text-gray-700 hover:text-blue-600 font-medium transition-colors">
-              Admin
             </Link>
           </nav>
 
-          {/* Search and Mobile Menu */}
-          <div className="flex items-center space-x-4">
-            <button className="hidden md:flex items-center space-x-2 px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
-              <Search className="w-4 h-4 text-gray-600" />
-              <span className="text-sm text-gray-600">Search tools...</span>
-            </button>
+          {/* 3. SEARCH & ACTIONS */}
+          <div className="flex items-center gap-4">
+            {/* Desktop Search Bar */}
+            <form onSubmit={handleSearch} className="hidden md:flex relative">
+              <input
+                type="text"
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 pr-4 py-2 bg-gray-100 border-none rounded-full text-sm focus:ring-2 focus:ring-blue-500 w-64"
+              />
+              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            </form>
 
-            {/* Mobile Menu Button */}
+            <Link href="/contact" className="hidden md:block text-sm font-medium text-gray-600 hover:text-blue-600">
+              Contact
+            </Link>
+
+            {/* Mobile Menu Button (Visible on Mobile) */}
             <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-lg hover:bg-gray-100"
+              className="md:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-md"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
           </div>
         </div>
+      </div>
 
-        {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <div className="md:hidden py-4 border-t border-gray-200">
-            <nav className="flex flex-col space-y-3">
-              <Link href="/articles" className="text-gray-700 hover:text-blue-600 font-medium py-2">
-                Articles
-              </Link>
-              <Link href="/tools" className="text-gray-700 hover:text-blue-600 font-medium py-2">
-                Tools
-              </Link>
-              <Link href="/categories" className="text-gray-700 hover:text-blue-600 font-medium py-2">
-                Categories
-              </Link>
-              <Link href="/about" className="text-gray-700 hover:text-blue-600 font-medium py-2">
-                About
-              </Link>
-              <Link href="/contact" className="text-gray-700 hover:text-blue-600 font-medium py-2">
-                Contact
-              </Link>
-              <Link href="/admin/topics" className="text-gray-700 hover:text-blue-600 font-medium py-2">
-                Admin
-              </Link>
+      {/* 4. MOBILE MENU DROPDOWN */}
+      {isMobileMenuOpen && (
+        <div className="md:hidden border-t border-gray-200 bg-white">
+          <div className="p-4 space-y-4">
+            <form onSubmit={handleSearch} className="relative">
+              <input
+                type="text"
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-gray-100 border-none rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+              />
+              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            </form>
+            <nav className="flex flex-col gap-2">
+              <Link href="/articles" className="block py-2 text-gray-700 font-medium hover:text-blue-600">Articles</Link>
+              <Link href="/categories" className="block py-2 text-gray-700 font-medium hover:text-blue-600">Categories</Link>
+              <Link href="/tools" className="block py-2 text-gray-700 font-medium hover:text-blue-600">Tools</Link>
+              <Link href="/about" className="block py-2 text-gray-700 font-medium hover:text-blue-600">About</Link>
+              <Link href="/contact" className="block py-2 text-gray-700 font-medium hover:text-blue-600">Contact</Link>
             </nav>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </header>
   );
 }
-// AI Generated Code by Deloitte + Cursor (END)

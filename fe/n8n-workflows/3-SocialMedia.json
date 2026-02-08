@@ -21,7 +21,7 @@
         {
             "parameters": {
                 "method": "POST",
-                "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=AIzaSyA_LWYIgzVBN00LRimeKfL-KxV19S_Ydxg",
+                "url": "=https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=AIzaSyCF1wzdvVfkOFy-17PgQsH_BcZJZiZDtgs",
                 "authentication": "none",
                 "sendQuery": false,
                 "sendHeaders": true,
@@ -38,7 +38,7 @@
                     "parameters": []
                 },
                 "specifyBody": "json",
-                "jsonBody": "={{ {\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"You are a Social Media Manager.\\n\\nWrite social posts for this new article:\\nTitle: \" + $json.body.title + \"\\nSummary: \" + ($json.body.excerpt || $json.body.title) + \"\\nLink: \" + ($json.body.url || 'https://devtoolsnexus.com/blog/' + $json.body.slug) + \"\\n\\nOutput JSON:\\n{\\n  \\\"twitter\\\": \\\"Tweet text with hashtags (max 280 chars)\\\",\\n  \\\"linkedin\\\": \\\"Professional post text with hashtags\\\"\\n}\"\n    }]\n  }],\n  \"generationConfig\": {\n    \"temperature\": 0.7,\n    \"topP\": 0.8,\n    \"topK\": 40,\n    \"maxOutputTokens\": 2048,\n    \"responseMimeType\": \"application/json\"\n  }\n} }}",
+                "jsonBody": "={{ {\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"You are a Social Media Manager.\\n\\nWrite social posts for this new article:\\nTitle: \" + $json.body.title + \"\\nSummary: \" + ($json.body.excerpt || $json.body.title) + \"\\nLink: \" + ($json.body.url || 'https://devtoolsnexus.com/blog/' + $json.body.slug) + \"\\n\\nOutput JSON:\\n{\\n  \\\"twitter\\\": \\\"Tweet text with hashtags (max 280 chars)\\\",\\n  \\\"linkedin\\\": \\\"Professional post text with hashtags\\\"\\n}\"\n    }]\n  }],\n  \"generationConfig\": {\n    \"temperature\": 0.7,\n    \"topP\": 0.8,\n    \"topK\": 40,\n    \"maxOutputTokens\": 2048\n  }\n} }}",
                 "options": {}
             },
             "id": "gemini-social",
@@ -66,7 +66,7 @@
         {
             "parameters": {
                 "method": "POST",
-                "url": "http://192.168.29.102:3000/api/social-posts",
+                "url": "http://host.docker.internal:3000/api/social-posts",
                 "sendHeaders": true,
                 "headerParameters": {
                     "parameters": [
@@ -107,7 +107,7 @@
         {
             "parameters": {
                 "method": "POST",
-                "url": "http://192.168.29.102:3000/api/social-posts",
+                "url": "http://host.docker.internal:3000/api/social-posts",
                 "sendHeaders": true,
                 "headerParameters": {
                     "parameters": [

@@ -2,13 +2,18 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase';
+import { createBrowserClient } from '@supabase/auth-helpers-nextjs';
 import { LogOut, LayoutDashboard, FileText, Home, Settings } from 'lucide-react';
 
 export default function AdminHeader() {
     const router = useRouter();
     const pathname = usePathname();
-    const supabase = createClient();
+
+    // Use createBrowserClient for consistent cookie handling with middleware
+    const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
 
     const handleLogout = async () => {
         await supabase.auth.signOut();

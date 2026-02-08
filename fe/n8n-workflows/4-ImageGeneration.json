@@ -21,7 +21,7 @@
         {
             "parameters": {
                 "method": "POST",
-                "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=AIzaSyA_LWYIgzVBN00LRimeKfL-KxV19S_Ydxg",
+                "url": "=https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=AIzaSyCF1wzdvVfkOFy-17PgQsH_BcZJZiZDtgs",
                 "authentication": "none",
                 "sendQuery": false,
                 "sendHeaders": true,
@@ -38,7 +38,7 @@
                     "parameters": []
                 },
                 "specifyBody": "json",
-                "jsonBody": "={{ {\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"Create a vivid, cinematic AI image prompt for a hero image for this article.\\n\\nTitle: \" + $json.body.title + \"\\nSummary: \" + ($json.body.excerpt || '') + \"\\n\\nOutput JSON:\\n{\\n  \\\"prompt\\\": \\\"A futuristic close-up of... style of... (max 30 words)\\\"\\n}\"\n    }]\n  }],\n  \"generationConfig\": {\n    \"temperature\": 0.7,\n    \"topP\": 0.8,\n    \"topK\": 40,\n    \"maxOutputTokens\": 1024,\n    \"responseMimeType\": \"application/json\"\n  }\n} }}",
+                "jsonBody": "={{ {\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"Create a vivid, cinematic AI image prompt for a hero image for this article.\\n\\nTitle: \" + $json.body.title + \"\\nSummary: \" + ($json.body.excerpt || '') + \"\\n\\nCRITICAL: Output ONLY valid JSON, no markdown, no code blocks.\\n\\nOutput this exact structure:\\n{\\n  \\\"prompt\\\": \\\"A detailed, vivid image description (max 30 words)\\\"\\n}\"\n    }]\n  }],\n  \"generationConfig\": {\n    \"temperature\": 0.7,\n    \"topP\": 0.8,\n    \"topK\": 40,\n    \"maxOutputTokens\": 1024\n  }\n} }}",
                 "options": {}
             },
             "id": "gemini-prompt",
@@ -52,7 +52,7 @@
         },
         {
             "parameters": {
-                "jsCode": "const response = $input.first().json;\nconst rawText = response.candidates[0].content.parts[0].text;\nconst parsed = JSON.parse(rawText);\n\n// Get Article ID from webhook\nconst article = $('Webhook - Article Created').first().json.body;\n\n// Construct Pollinations URL\nconst prompt = parsed.prompt;\nconst encoded = encodeURIComponent(prompt);\nconst imageUrl = `https://image.pollinations.ai/prompt/${encoded}?width=1280&height=720&model=flux&nologo=true`;\n\nreturn {\n  json: {\n    image_url: imageUrl,\n    article_id: article.id || article.article_id\n  }\n};"
+                "jsCode": "const response = $input.first().json;\n\ntry {\n  let rawText = response.candidates[0].content.parts[0].text;\n  \n  // Remove markdown code blocks if present\n  rawText = rawText.replace(/```json\\s*/g, '').replace(/```\\s*/g, '');\n  \n  // Find JSON boundaries\n  const firstOpen = rawText.indexOf('{');\n  const lastClose = rawText.lastIndexOf('}');\n  \n  if (firstOpen === -1 || lastClose === -1) {\n    throw new Error('No JSON found in Gemini response');\n  }\n  \n  let jsonText = rawText.substring(firstOpen, lastClose + 1);\n  \n  // Try to parse\n  let parsed;\n  try {\n    parsed = JSON.parse(jsonText);\n  } catch (parseError) {\n    // Fallback: extract prompt using regex\n    const match = jsonText.match(/\"prompt\"\\s*:\\s*\"([^\"]+)\"/);\n    if (match) {\n      parsed = { prompt: match[1] };\n    } else {\n      throw new Error('Could not extract prompt from response');\n    }\n  }\n  \n  // Get Article ID from webhook\n  const article = $('Webhook - Article Created').first().json.body;\n  \n  // Construct Pollinations URL\n  const prompt = parsed.prompt || 'Abstract technology background';\n  const encoded = encodeURIComponent(prompt);\n  const imageUrl = `https://image.pollinations.ai/prompt/${encoded}?width=1280&height=720&model=flux&nologo=true`;\n  \n  return {\n    json: {\n      image_url: imageUrl,\n      article_id: article.id || article.article_id,\n      prompt: prompt\n    }\n  };\n} catch (error) {\n  console.error('Image prompt generation failed:', error.message);\n  // Return a fallback image\n  const article = $('Webhook - Article Created').first().json.body;\n  return {\n    json: {\n      image_url: 'https://image.pollinations.ai/prompt/Abstract%20technology%20background?width=1280&height=720&model=flux&nologo=true',\n      article_id: article.id || article.article_id,\n      prompt: 'Fallback: Abstract technology background',\n      error: error.message\n    }\n  };\n}"
             },
             "id": "construct-url",
             "name": "Construct Image URL",
@@ -66,7 +66,7 @@
         {
             "parameters": {
                 "method": "PATCH",
-                "url": "http://192.168.29.102:3000/api/articles",
+                "url": "http://host.docker.internal:3000/api/articles",
                 "sendHeaders": true,
                 "headerParameters": {
                     "parameters": [

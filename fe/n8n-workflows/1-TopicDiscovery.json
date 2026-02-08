@@ -1,5 +1,5 @@
 {
-    "name": "Topic Discovery - Daily Scraper (Auto-Loop)",
+    "name": "Topic Discovery - Multi-Source (Google, HN, Dev.to, PH, Reddit)",
     "nodes": [
         {
             "parameters": {
@@ -17,7 +17,7 @@
             "type": "n8n-nodes-base.scheduleTrigger",
             "typeVersion": 1.1,
             "position": [
-                250,
+                100,
                 300
             ]
         },
@@ -28,46 +28,104 @@
             "type": "n8n-nodes-base.manualTrigger",
             "typeVersion": 1,
             "position": [
-                250,
+                100,
                 460
             ]
         },
         {
             "parameters": {
-                "url": "https://news.google.com/rss/search?q=AI+tools+for+developers+productivity&hl=en-US&gl=US&ceid=US:en",
+                "url": "https://news.google.com/rss/search?q=(%22AI+tools%22+OR+%22DevOps%22+OR+%22Frontend%22+OR+%22Cybersecurity%22+OR+%22Open+Source%22+OR+%22System+Design%22+OR+%22Tech+Trends%22)+AND+%22developer%22&hl=en-US&gl=US&ceid=US:en",
                 "responseFormat": "string",
                 "options": {
                     "responsePropertyName": "data"
                 }
             },
-            "id": "fetch-rss",
+            "id": "fetch-google-news",
             "name": "Fetch Google News RSS",
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.1,
             "position": [
-                450,
-                380
+                300,
+                200
             ]
         },
         {
             "parameters": {
-                "jsCode": "// Manual XML Parsing (Regex) to avoid XML Node issues\nconst xml = $input.first().json.data;\nconst items = [];\n\n// Regex to match <item>...</item>\nconst itemRegex = /<item>([\\s\\S]*?)<\\/item>/g;\nlet match;\n\nwhile ((match = itemRegex.exec(xml)) !== null) {\n  const content = match[1];\n  \n  // Extract fields\n  const titleMatch = /<title>([\\s\\S]*?)<\\/title>/.exec(content);\n  const linkMatch = /<link>([\\s\\S]*?)<\\/link>/.exec(content);\n  const descMatch = /<description>([\\s\\S]*?)<\\/description>/.exec(content);\n  const dateMatch = /<pubDate>([\\s\\S]*?)<\\/pubDate>/.exec(content);\n\n  if (titleMatch && linkMatch) {\n    items.push({\n      title: titleMatch[1].replace(/<!\\[CDATA\\[/g, '').replace(/\\]\\]>/g, ''),\n      link: linkMatch[1],\n      description: descMatch ? descMatch[1].replace(/<[^>]*>/g, '') : '',\n      pubDate: dateMatch ? dateMatch[1] : ''\n    });\n  }\n}\n\n// Return top 20\nreturn {\n  json: {\n    newsItems: items.slice(0, 20)\n  }\n};"
+                "url": "https://hacker-news.firebaseio.com/v0/topstories.json?print=pretty",
+                "options": {}
             },
-            "id": "simplify-rss",
-            "name": "Parse & Extract Top 20",
+            "id": "fetch-hn-ids",
+            "name": "Fetch HN Top Stories",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                300,
+                350
+            ]
+        },
+        {
+            "parameters": {
+                "url": "https://dev.to/api/articles?tag=ai&top=1&per_page=10",
+                "options": {}
+            },
+            "id": "fetch-devto",
+            "name": "Fetch Dev.to Articles",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                300,
+                500
+            ]
+        },
+        {
+            "parameters": {
+                "url": "https://www.producthunt.com/feed",
+                "responseFormat": "string",
+                "options": {}
+            },
+            "id": "fetch-producthunt",
+            "name": "Fetch Product Hunt",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                300,
+                650
+            ]
+        },
+        {
+            "parameters": {
+                "url": "https://www.reddit.com/r/MachineLearning/top.json?limit=10&t=day",
+                "options": {
+                    "responsePropertyName": "data"
+                }
+            },
+            "id": "fetch-reddit",
+            "name": "Fetch Reddit ML",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                300,
+                800
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const googleXML = $items(\"Fetch Google News RSS\")[0].json.data;\nconst devto = $items(\"Fetch Dev.to Articles\")[0].json;\nconst productHuntXML = $items(\"Fetch Product Hunt\")[0].json.data;\nconst redditData = $items(\"Fetch Reddit ML\")[0].json.data?.children || [];\n\nconst items = [];\n\n// 1. Parse Google News (RSS)\nconst itemRegex = /<item>([\\s\\S]*?)<\\/item>/g;\nlet match;\nwhile ((match = itemRegex.exec(googleXML)) !== null) {\n  const content = match[1];\n  const titleMatch = /<title>([\\s\\S]*?)<\\/title>/.exec(content);\n  const linkMatch = /<link>([\\s\\S]*?)<\\/link>/.exec(content);\n  if (titleMatch && linkMatch) {\n    items.push({\n      title: titleMatch[1].replace(/<!\\[CDATA\\[/g, '').replace(/\\]\\]>/g, ''),\n      link: linkMatch[1],\n      source: 'Google News'\n    });\n  }\n}\n\n// 2. Parse Dev.to (JSON)\nif (Array.isArray(devto)) {\n  devto.forEach(article => {\n    items.push({\n      title: article.title,\n      link: article.url,\n      source: 'Dev.to'\n    });\n  });\n}\n\n// 3. Parse Product Hunt (RSS)\nwhile ((match = itemRegex.exec(productHuntXML)) !== null) {\n  const content = match[1];\n  const titleMatch = /<title>([\\s\\S]*?)<\\/title>/.exec(content);\n  const linkMatch = /<link>([\\s\\S]*?)<\\/link>/.exec(content);\n  if (titleMatch && linkMatch) {\n    items.push({\n      title: titleMatch[1].replace(/<!\\[CDATA\\[/g, '').replace(/\\]\\]>/g, ''),\n      link: linkMatch[1],\n      source: 'Product Hunt'\n    });\n  }\n}\n\n// 4. Parse Reddit (JSON)\nif (Array.isArray(redditData)) {\n  redditData.forEach(post => {\n    items.push({\n      title: post.data.title,\n      link: 'https://reddit.com' + post.data.permalink,\n      source: 'Reddit'\n    });\n  });\n}\n\n// Limit to 50 items total to avoid token limits\nreturn { json: { newsItems: items.slice(0, 50) } };"
+            },
+            "id": "merge-sources",
+            "name": "Merge & Parse All Sources",
             "type": "n8n-nodes-base.code",
             "typeVersion": 2,
             "position": [
-                650,
-                380
+                600,
+                500
             ]
         },
         {
             "parameters": {
                 "method": "POST",
-                "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=AIzaSyA_LWYIgzVBN00LRimeKfL-KxV19S_Ydxg",
+                "url": "=https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=AIzaSyCF1wzdvVfkOFy-17PgQsH_BcZJZiZDtgs",
                 "authentication": "none",
-                "sendQuery": false,
                 "sendHeaders": true,
                 "headerParameters": {
                     "parameters": [
@@ -78,11 +136,8 @@
                     ]
                 },
                 "sendBody": true,
-                "bodyParameters": {
-                    "parameters": []
-                },
                 "specifyBody": "json",
-                "jsonBody": "={{ {\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"You are an Expert Editor for a Developer Productivity Blog.\\n\\nReview the following news list and IDENTIFY tools/topics that are specifically 'AI Productivity Tools for Developers'.\\n\\nDiscard general news, politics, financial news, or minor updates.\\nFocus on new tools, major AI coding assistant updates, or productivity frameworks.\\n\\nInput News List:\\n\" + JSON.stringify($json.newsItems) + \"\\n\\nOutput a JSON list of VALID topics only. Format:\\n{\\n  \\\"topics\\\": [\\n    {\\n      \\\"topic_title\\\": \\\"Clear, catchy title\\\",\\n      \\\"topic_description\\\": \\\"Why this is useful for developers (2 sentences)\\\",\\n      \\\"source_url\\\": \\\"Original link\\\",\\n      \\\"quality_score\\\": 85, // 0-100 relevance score\\n      \\\"niche_category\\\": \\\"AI productivity tools for developers\\\"\\n    }\\n  ]\\n}\"\n    }]\n  }],\n  \"generationConfig\": {\n    \"temperature\": 0.4,\n    \"topP\": 0.8,\n    \"topK\": 40,\n    \"maxOutputTokens\": 8192,\n    \"responseMimeType\": \"application/json\"\n  }\n} }}",
+                "jsonBody": "={{ {\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"You are an Expert Technical Editor. Review news items from multiple sources (Google, Reddit, Dev.to, ProductHunt) and identify high-value topics for software developers.\\n\\nDiscard general news, politics, financial markets, or duplicate stories.\\nKeep only technical news about tools, frameworks, security, or industry trends.\\n\\nInput News:\\n\" + JSON.stringify($json.newsItems) + \"\\n\\nOutput ONLY valid JSON with categorized topics:\\n{\\n  \\\"topics\\\": [\\n    {\\n      \\\"topic_title\\\": \\\"Clear, engaging title\\\",\\n      \\\"topic_description\\\": \\\"Description of the update/tool (2 sentences)\\\",\\n      \\\"source_url\\\": \\\"Original URL\\\",\\n      \\\"quality_score\\\": 85, // 0-100 relevance\\n      \\\"niche_category\\\": \\\"Category Name (Pick one: AI Tools, DevOps, Frontend, Cybersecurity, Open Source, System Design, Tech Trends)\\\"\\n    }\\n  ]\\n}\"\n    }]\n  }],\n  \"generationConfig\": {\n    \"temperature\": 0.4,\n    \"maxOutputTokens\": 8192\n  }\n} }}",
                 "options": {}
             },
             "id": "gemini-filter",
@@ -91,12 +146,12 @@
             "typeVersion": 4.1,
             "position": [
                 850,
-                380
+                500
             ]
         },
         {
             "parameters": {
-                "jsCode": "// Parse Gemini Response\nconst response = $input.first().json;\ntry {\n  const rawText = response.candidates[0].content.parts[0].text;\n  const parsed = JSON.parse(rawText);\n  \n  return parsed.topics.map(topic => ({\n    json: topic\n  }));\n} catch (e) {\n  return { json: { error: e.message } };\n}"
+                "jsCode": "const response = $input.first().json;\n\ntry {\n  if (!response?.candidates?.[0]?.content?.parts?.[0]?.text) {\n    return [];\n  }\n\n  let text = response.candidates[0].content.parts[0].text;\n  text = text.replace(/```json\\s*/g, '').replace(/```\\s*/g, '');\n  \n  const start = text.indexOf('{');\n  if (start === -1) return [];\n  \n  let count = 0, end = -1;\n  for (let i = start; i < text.length; i++) {\n    if (text[i] === '{') count++;\n    if (text[i] === '}') count--;\n    if (count === 0) { end = i; break; }\n  }\n  \n  if (end === -1) return [];\n  \n  const parsed = JSON.parse(text.substring(start, end + 1));\n  if (!parsed.topics || !Array.isArray(parsed.topics)) return [];\n  \n  return parsed.topics\n    .filter(t => t.topic_title && t.topic_description)\n    .map(t => ({ json: t }));\n} catch (e) {\n  console.error('Parse error:', e.message);\n  return [];\n}"
             },
             "id": "parse-gemini",
             "name": "Parse Filtered Topics",
@@ -104,13 +159,13 @@
             "typeVersion": 2,
             "position": [
                 1050,
-                380
+                500
             ]
         },
         {
             "parameters": {
                 "method": "POST",
-                "url": "http://192.168.29.102:3000/api/topics",
+                "url": "http://host.docker.internal:3000/api/topics",
                 "sendHeaders": true,
                 "headerParameters": {
                     "parameters": [
@@ -121,34 +176,8 @@
                     ]
                 },
                 "sendBody": true,
-                "bodyParameters": {
-                    "parameters": [
-                        {
-                            "name": "topic_title",
-                            "value": "={{ $json.topic_title }}"
-                        },
-                        {
-                            "name": "topic_description",
-                            "value": "={{ $json.topic_description }}"
-                        },
-                        {
-                            "name": "niche_category",
-                            "value": "={{ $json.niche_category }}"
-                        },
-                        {
-                            "name": "quality_score",
-                            "value": "={{ $json.quality_score }}"
-                        },
-                        {
-                            "name": "source_url",
-                            "value": "={{ $json.source_url }}"
-                        },
-                        {
-                            "name": "discovered_via",
-                            "value": "google_news_rss"
-                        }
-                    ]
-                },
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"topic_title\": \"{{ $json.topic_title }}\",\n  \"topic_description\": \"{{ $json.topic_description }}\",\n  \"niche_category\": \"{{ $json.niche_category || 'AI productivity tools for developers' }}\",\n  \"quality_score\": {{ $json.quality_score || 75 }},\n  \"source_url\": \"{{ $json.source_url || '' }}\",\n  \"discovered_via\": \"multi_source_scraper\"\n}",
                 "options": {}
             },
             "id": "save-topic",
@@ -157,7 +186,7 @@
             "typeVersion": 4.1,
             "position": [
                 1250,
-                380
+                500
             ]
         }
     ],
@@ -167,6 +196,27 @@
                 [
                     {
                         "node": "Fetch Google News RSS",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Fetch Dev.to Articles",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Fetch Product Hunt",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Fetch Reddit ML",
                         "type": "main",
                         "index": 0
                     }
@@ -181,6 +231,27 @@
                         "type": "main",
                         "index": 0
                     }
+                ],
+                [
+                    {
+                        "node": "Fetch Dev.to Articles",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Fetch Product Hunt",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Fetch Reddit ML",
+                        "type": "main",
+                        "index": 0
+                    }
                 ]
             ]
         },
@@ -188,14 +259,47 @@
             "main": [
                 [
                     {
-                        "node": "Parse & Extract Top 20",
+                        "node": "Merge & Parse All Sources",
                         "type": "main",
                         "index": 0
                     }
                 ]
             ]
         },
-        "Parse & Extract Top 20": {
+        "Fetch Dev.to Articles": {
+            "main": [
+                [
+                    {
+                        "node": "Merge & Parse All Sources",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Fetch Product Hunt": {
+            "main": [
+                [
+                    {
+                        "node": "Merge & Parse All Sources",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Fetch Reddit ML": {
+            "main": [
+                [
+                    {
+                        "node": "Merge & Parse All Sources",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Merge & Parse All Sources": {
             "main": [
                 [
                     {

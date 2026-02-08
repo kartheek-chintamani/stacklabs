@@ -9,7 +9,7 @@ async function getLatestArticles() {
     const supabase = createAdminClient();
     const { data } = await supabase
       .from('articles')
-      .select('*')
+      .select('*, content_topics(niche_category)')
       .eq('status', 'published')
       .order('created_at', { ascending: false })
       .limit(3);
@@ -19,6 +19,9 @@ async function getLatestArticles() {
     return [];
   }
 }
+
+// Disable caching for this page
+export const revalidate = 0;
 
 export default async function Home() {
   const articles = await getLatestArticles();
@@ -118,7 +121,7 @@ export default async function Home() {
                     <div className="p-6 flex-1 flex flex-col">
                       <div className="flex items-center gap-2 mb-3">
                         <span className="text-xs font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-                          {article.niche_category || 'AI Tool'}
+                          {article.content_topics?.niche_category || 'AI Tool'}
                         </span>
                         <span className="text-xs text-gray-500">
                           {article.reading_time_minutes ? `${article.reading_time_minutes} min read` : '5 min read'}

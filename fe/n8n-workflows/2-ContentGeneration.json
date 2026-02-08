@@ -34,7 +34,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyA_LWYIgzVBN00LRimeKfL-KxV19S_Ydxg",
+        "url": "=https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=AIzaSyCF1wzdvVfkOFy-17PgQsH_BcZJZiZDtgs",
         "authentication": "none",
         "sendQuery": false,
         "sendHeaders": true,
@@ -51,7 +51,7 @@
           "parameters": []
         },
         "specifyBody": "json",
-        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"You are an expert technical content writer for DevTools Nexus, a site reviewing AI productivity tools for developers.\\n\\nGenerate a comprehensive, SEO-optimized article about: {{ $json.topicTitle }}\\n\\nTarget Audience: {{ $json.targetAudience }}\\nContent Type: {{ $json.contentType }}\\nKeywords: {{ $json.topicKeywords.join(', ') }}\\n\\nIMPORTANT REQUIREMENTS:\\n1. Write approx 1500 words (High Quality over Quantity)\\n2. Use clear headings (H2, H3)\\n3. Include actionable tips and examples\\n4. Add code snippets where relevant\\n5. Maintain professional but friendly tone\\n6. Include pros/cons sections\\n7. Add comparison tables if comparing tools\\n8. Provide step-by-step tutorials\\n9. Include best practices\\n10. End with practical takeaways\\n\\nSTRICT JSON FORMATTING:\\n- Escape all double quotes inside the content string.\\n- Do not output trailing commas.\\n- Ensure the JSON is valid and complete.\\n\\nFormat the response as JSON:\\n{\\n  \\\"title\\\": \\\"Article title (60 chars max)\\\",\\n  \\\"subtitle\\\": \\\"Engaging subtitle (120 chars)\\\",\\n  \\\"content\\\": \\\"Full markdown article content\\\",\\n  \\\"excerpt\\\": \\\"Brief 150-word summary\\\",\\n  \\\"metaDescription\\\": \\\"SEO description (155 chars max)\\\",\\n  \\\"tags\\\": [\\\"tag1\\\", \\\"tag2\\\", \\\"tag3\\\"],\\n  \\\"readingTime\\\": 10,\\n  \\\"keyTakeaways\\\": [\\\"Point 1\\\", \\\"Point 2\\\", \\\"Point 3\\\"]\\n}\\n\\nGenerate high-quality, original content that provides real value to developers.\"\n    }]\n  }],\n  \"generationConfig\": {\n    \"temperature\": 0.7,\n    \"topP\": 0.8,\n    \"topK\": 40,\n    \"maxOutputTokens\": 8192,\n    \"responseMimeType\": \"application/json\"\n  }\n}",
+        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"You are an expert Senior Technical Writer for a Developer Blog.\\n\\nWrite a comprehensive, deep-dive article about: {{ $json.topicTitle }}\\nCategory: {{ $json.topicCategory || 'Software Development' }}\\nTarget Audience: {{ $json.targetAudience }}\\nKeywords: {{ $json.topicKeywords.join(', ') }}\\n\\nREQUIREMENTS:\\n- Write 1500+ words of high-quality technical content\\n- Focus on {{ $json.topicCategory }}: Use industry-standard terminology\\n- Include code snippets where relevant (use ```language blocks)\\n- Structure with clear H2/H3 headings\\n- Include 'Pros & Cons' or 'Best Practices' section\\n- Tone: Professional, authoritative, yet accessible\\n\\nCRITICAL - JSON OUTPUT FORMAT:\\nYou MUST respond with ONLY valid JSON. No markdown wrapping the JSON itself.\\nUse single quotes inside content strings to avoid JSON breaking.\\n\\nOutput Structure:\\n{\\n  \\\"title\\\": \\\" SEO-optimized Title\\\",\\n  \\\"subtitle\\\": \\\"Engaging hook\\\",\\n  \\\"content\\\": \\\"Full article markdown. Use \\\\n for newlines.\\\",\\n  \\\"excerpt\\\": \\\"Unqiue summary (150 words)\\\",\\n  \\\"metaDescription\\\": \\\"SEO meta (160 chars)\\\",\\n  \\\"tags\\\": [\\\"tag1\\\", \\\"tag2\\\", \\\"tag3\\\"],\\n  \\\"readingTime\\\": 10,\\n  \\\"keyTakeaways\\\": [\\\"Point 1\\\", \\\"Point 2\\\", \\\"Point 3\\\"]\\n}\\n\\nGenerate only the JSON now.\"\n    }]\n  }],\n  \"generationConfig\": {\n    \"temperature\": 0.7,\n    \"topP\": 0.8,\n    \"topK\": 40,\n    \"maxOutputTokens\": 8192\n  }\n}",
         "options": {}
       },
       "id": "generate-article",
@@ -68,7 +68,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// SIMPLIFIED ROBUST PARSING\nconst response = $input.first().json;\n\ntry {\n  const rawText = response.candidates[0].content.parts[0].text;\n  \n  // Find the JSON object boundaries\n  const firstOpen = rawText.indexOf('{');\n  const lastClose = rawText.lastIndexOf('}');\n  \n  if (firstOpen === -1 || lastClose === -1) {\n     throw new Error('No JSON found in response');\n  }\n  \n  // Extract only the JSON part\n  const jsonText = rawText.substring(firstOpen, lastClose + 1);\n  \n  // Parse it\n  const article = JSON.parse(jsonText);\n  \n  const topicData = $('Parse Topic Data').first().json;\n  \n  // Normalize and Defaulting\n  return {\n    json: {\n      topic_id: topicData.topicId,\n      title: article.title || topicData.topicTitle,\n      slug: (article.title || topicData.topicTitle).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),\n      subtitle: article.subtitle || '',\n      content: article.content || '',\n      excerpt: article.excerpt || '',\n      meta_description: article.metaDescription || '',\n      author_name: 'AI Content Team',\n      author_avatar: '/avatars/ai-team.jpg',\n      cover_image: '/images/placeholder-article.jpg',\n      reading_time_minutes: article.readingTime || 10,\n      status: 'pending_review',\n      published_at: null,\n      tags: article.tags || [],\n      key_takeaways: article.keyTakeaways || [],\n      quality_report: {\n        overall_score: 85,\n        readability_score: 80,\n        seo_score: 85,\n        originality_score: 90\n      }\n    }\n  };\n} catch (error) {\n  throw new Error('Parsing Failed: ' + error.message);\n}"
+        "jsCode": "const response = $input.first().json;\n\ntry {\n  if (!response?.candidates?.[0]?.content?.parts?.[0]?.text) {\n    throw new Error('Invalid response');\n  }\n\n  const text = response.candidates[0].content.parts[0].text;\n  const topicData = $('Parse Topic Data').first().json;\n  \n  // Extract each field using regex\n  const extract = (field) => {\n    const re = new RegExp('\"' + field + '\"\\\\s*:\\\\s*\"([\\\\s\\\\S]*?)\"\\\\s*[,}]');\n    const m = text.match(re);\n    return m ? m[1].replace(/\\\\n/g, '\\n').replace(/\\\\\"/g, '\"') : '';\n  };\n  \n  const extractNum = (field) => {\n    const re = new RegExp('\"' + field + '\"\\\\s*:\\\\s*(\\\\d+)');\n    const m = text.match(re);\n    return m ? parseInt(m[1]) : 10;\n  };\n  \n  const extractArr = (field) => {\n    const re = new RegExp('\"' + field + '\"\\\\s*:\\\\s*\\\\[([^\\\\]]*?)\\\\]');\n    const m = text.match(re);\n    if (!m) return [];\n    return m[1].split(',').map(s => s.trim().replace(/^\"|\"$/g, '')).filter(s => s);\n  };\n  \n  const title = extract('title') || topicData.topicTitle;\n  const content = extract('content') || 'Content generation in progress...';\n  \n  return {\n    json: {\n      topic_id: topicData.topicId,\n      title: title,\n      slug: title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),\n      subtitle: extract('subtitle'),\n      content: content,\n      excerpt: extract('excerpt') || content.substring(0, 200),\n      meta_description: extract('metaDescription'),\n      author_name: 'AI Content Team',\n      author_avatar: '/avatars/ai-team.jpg',\n      cover_image: '/images/placeholder-article.jpg',\n      reading_time_minutes: extractNum('readingTime'),\n      status: 'published',\n      published_at: new Date().toISOString(),\n      tags: extractArr('tags'),\n      key_takeaways: extractArr('keyTakeaways'),\n      quality_report: { overall_score: 85, readability_score: 80, seo_score: 85, originality_score: 90 }\n    }\n  };\n} catch (e) {\n  console.error('Parse failed:', e.message);\n  throw e;\n}"
       },
       "id": "parse-article",
       "name": "Parse Article Response",
@@ -82,7 +82,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://192.168.29.102:3000/api/articles",
+        "url": "http://host.docker.internal:3000/api/articles",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -152,7 +152,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Success response\nconst article = $('Save Article to Database').first().json.article;\n\nreturn {\n  json: {\n    success: true,\n    message: 'Article generated, saved, and image generation started',\n    articleId: article.id,\n    status: 'pending_review'\n  }\n};"
+        "jsCode": "// Success response\nconst article = $('Save Article to Database').first().json.article;\n\nreturn {\n  json: {\n    success: true,\n    message: 'Article generated, published, and image generation started',\n    articleId: article.id,\n    articleSlug: article.slug,\n    status: 'published'\n  }\n};"
       },
       "id": "success-response",
       "name": "Success Response",

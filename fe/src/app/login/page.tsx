@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { createClient } from '@/lib/supabase';
+import { createBrowserClient } from '@supabase/auth-helpers-nextjs';
 import { Lock, Mail, Loader2, AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
@@ -12,7 +12,12 @@ export default function LoginPage() {
     const [error, setError] = useState<string | null>(null);
     const router = useRouter();
     const searchParams = useSearchParams();
-    const supabase = createClient();
+
+    // Use createBrowserClient to handle cookies correctly for middleware
+    const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -30,7 +35,7 @@ export default function LoginPage() {
             } else {
                 // Successful login
                 const next = searchParams.get('next') || '/admin/topics';
-                router.refresh(); // Refresh to update server components/middleware state
+                router.refresh(); // Refresh to ensure middleware re-evaluates auth state
                 router.push(next);
             }
         } catch (err: any) {
